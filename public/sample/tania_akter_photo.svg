@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cfd9df" />
+      <stop offset="100%" stop-color="#e2ebf0" />
+    </linearGradient>
+    <radialGradient id="faceShade" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#fae7d9" />
+      <stop offset="85%" stop-color="#eec7b0" />
+      <stop offset="100%" stop-color="#d9aa92" />
+    </radialGradient>
+    <linearGradient id="hijabGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2a324b" />
+      <stop offset="50%" stop-color="#1e2436" />
+      <stop offset="100%" stop-color="#151926" />
+    </linearGradient>
+  </defs>
+
+  <!-- Passport Background -->
+  <rect width="200" height="240" fill="url(#bgGrad)" />
+
+  <!-- Body / Shoulder Garment -->
+  <path d="M 20 240 C 20 195 60 180 100 180 C 140 180 180 195 180 240 Z" fill="#182030" />
+  <path d="M 50 240 L 75 195 L 125 195 L 150 240 Z" fill="#2d3748" opacity="0.3" />
+
+  <!-- Outer Hijab Hood Shape -->
+  <path d="M 46 115 C 45 60 70 38 100 38 C 130 38 155 60 154 115 C 154 150 148 185 100 185 C 52 185 46 150 46 115 Z" fill="url(#hijabGrad)" />
+
+  <!-- Face Oval -->
+  <ellipse cx="100" cy="118" rx="33" ry="42" fill="url(#faceShade)" />
+
+  <!-- Under-cap / Inner Hijab band across forehead -->
+  <path d="M 72 90 C 85 82 115 82 128 90 C 122 84 105 78 95 78 C 85 78 75 83 72 90 Z" fill="#3b4252" />
+
+  <!-- Eyebrows -->
+  <path d="M 76 104 Q 86 100 95 103" stroke="#4a3728" stroke-width="2.5" stroke-linecap="round" fill="none" />
+  <path d="M 105 103 Q 114 100 124 104" stroke="#4a3728" stroke-width="2.5" stroke-linecap="round" fill="none" />
+
+  <!-- Eyes -->
+  <!-- Left Eye -->
+  <ellipse cx="86" cy="111" rx="5.5" ry="3.5" fill="#ffffff" />
+  <circle cx="86" cy="111" r="2.8" fill="#301b10" />
+  <circle cx="85" cy="110" r="0.9" fill="#ffffff" />
+  <path d="M 80 110 Q 86 107 92 110" stroke="#382519" stroke-width="1.2" fill="none" />
+
+  <!-- Right Eye -->
+  <ellipse cx="114" cy="111" rx="5.5" ry="3.5" fill="#ffffff" />
+  <circle cx="114" cy="111" r="2.8" fill="#301b10" />
+  <circle cx="113" cy="110" r="0.9" fill="#ffffff" />
+  <path d="M 108 110 Q 114 107 120 110" stroke="#382519" stroke-width="1.2" fill="none" />
+
+  <!-- Nose -->
+  <path d="M 100 110 L 98 124 Q 100 127 103 125" stroke="#c4977e" stroke-width="1.8" stroke-linecap="round" fill="none" />
+
+  <!-- Lips / Mouth with gentle smile -->
+  <path d="M 91 138 Q 100 142 109 138" stroke="#a85d56" stroke-width="2" fill="none" stroke-linecap="round" />
+  <path d="M 93 138 Q 100 144 107 138" fill="#b86962" />
+
+  <!-- Cheeks soft glow -->
+  <ellipse cx="81" cy="125" rx="6" ry="3.5" fill="#f8b4a6" opacity="0.45" />
+  <ellipse cx="119" cy="125" rx="6" ry="3.5" fill="#f8b4a6" opacity="0.45" />
+
+  <!-- Hijab wrap fold below chin -->
+  <path d="M 68 152 Q 100 162 132 152 Q 138 175 100 178 Q 62 175 68 152 Z" fill="#1b2030" />
+  <path d="M 85 160 Q 100 174 115 160" stroke="#121622" stroke-width="2" fill="none" />
+</svg>

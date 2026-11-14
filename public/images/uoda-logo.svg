@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <defs>
+    <path id="textCircle" d="M 80, 80 m -62, 0 a 62,62 0 1,1 124,0 a 62,62 0 1,1 -124,0" />
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  
+  <!-- Outer circle border -->
+  <circle cx="80" cy="80" r="76" fill="#ffffff" stroke="#162e58" stroke-width="3" />
+  <circle cx="80" cy="80" r="71" fill="none" stroke="#cca23b" stroke-width="1.5" />
+  <circle cx="80" cy="80" r="50" fill="#f0f5fa" stroke="#162e58" stroke-width="2" />
+  
+  <!-- Circular text -->
+  <text font-family="Arial, sans-serif" font-size="9.5" font-weight="bold" fill="#162e58" letter-spacing="1.5">
+    <textPath href="#textCircle" startOffset="50%" text-anchor="middle">
+      UNIVERSITY OF DEVELOPMENT ALTERNATIVE • UODA •
+    </textPath>
+  </text>
+  
+  <!-- Inner graphic: Open Book & Torch / Rising Sun -->
+  <g transform="translate(48, 52)" fill="#162e58">
+    <!-- Sun rays -->
+    <path d="M32 6 L32 0 M22 9 L17 4 M42 9 L47 4 M15 19 L9 16 M49 19 L55 16" stroke="#cca23b" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="32" cy="18" r="7" fill="#cca23b"/>
+    
+    <!-- Open Book -->
+    <path d="M32 29 C24 23 10 24 4 26 L4 46 C11 43 23 43 32 47 C41 43 53 43 60 46 L60 26 C54 24 40 23 32 29 Z" fill="#162e58" stroke="#10213d" stroke-width="1.5"/>
+    <path d="M32 29 L32 47" stroke="#ffffff" stroke-width="1.5"/>
+    <path d="M9 31 C16 29 25 29 30 33" stroke="#ffffff" stroke-width="1" fill="none"/>
+    <path d="M9 36 C16 34 25 34 30 38" stroke="#ffffff" stroke-width="1" fill="none"/>
+    <path d="M55 31 C48 29 39 29 34 33" stroke="#ffffff" stroke-width="1" fill="none"/>
+    <path d="M55 36 C48 34 39 34 34 38" stroke="#ffffff" stroke-width="1" fill="none"/>
+  </g>
+  
+  <!-- Wreath leaves bottom -->
+  <path d="M 40 120 C 50 128 65 130 80 130 C 95 130 110 128 120 120 C 108 125 95 126 80 126 C 65 126 52 125 40 120 Z" fill="#cca23b" />
+</svg>

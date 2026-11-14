@@ -1,0 +1,22 @@
+[
+  {
+    "id": "789107238548",
+    "student_id": "789107238548",
+    "student_name": "Tania Akter",
+    "date_of_birth": "09 Sep 1992",
+    "registration_number": "358737",
+    "father_name": "Rafiqul Islam",
+    "mother_name": "Nahar Begum",
+    "major_subject": "Bachelor of Business Administration (BBA)",
+    "cgpa": "3.25",
+    "issue_date": "2020-12-01",
+    "student_photo_url": "/sample/tania_akter_photo.svg",
+    "certificate_image_url": "/sample/tania_akter_certificate.svg",
+    "certificate_pdf_url": "/sample/tania_akter_certificate.pdf",
+    "degree_title": "Bachelor of Business Administration",
+    "institution_name": "University of Development Alternative",
+    "status": "verified",
+    "created_at": "2020-12-01T10:00:00.000Z",
+    "updated_at": "2026-11-14T12:00:00.000Z"
+  }
+]
