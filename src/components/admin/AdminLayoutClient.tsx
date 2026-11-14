@@ -14,13 +14,13 @@ export default function AdminLayoutClient({
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // If on login page, don't show admin chrome
+  // If on login page, don't show admin sidebar/header
   if (pathname === "/admin/login") {
     return <>{children}</>;
   }
 
   return (
-    <div className="min-h-screen flex bg-[#f1f5f9] text-slate-800">
+    <div className="min-h-screen flex bg-[#f1f5f9] text-slate-800 antialiased">
       {/* Sidebar Navigation */}
       <AdminSidebar
         isMobileOpen={isMobileMenuOpen}
@@ -38,23 +38,23 @@ export default function AdminLayoutClient({
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h2 className="text-base sm:text-lg font-bold text-slate-800 tracking-tight">
+            <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
               Certificate Management System
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/"
               target="_blank"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
             >
               <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              <span>View Portal</span>
+              <span className="hidden xs:inline">View Portal</span>
             </Link>
             <Link
               href="/admin/certificates/new"
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-lg bg-[#cca23b] hover:bg-[#d8ad42] text-[#12284c] shadow-xs transition"
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-[#cca23b] hover:bg-[#d8ad42] text-[#12284c] shadow-xs transition"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Add Student Record</span>
@@ -64,7 +64,7 @@ export default function AdminLayoutClient({
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-4 sm:p-8 overflow-y-auto">{children}</main>
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto">{children}</main>
       </div>
     </div>
   );
