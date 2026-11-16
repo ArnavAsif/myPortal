@@ -31,8 +31,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 4. Protect admin data mutation APIs
-  if (pathname.startsWith("/api/certificates") && request.method !== "GET") {
+  // 4. Protect admin data mutation and upload APIs
+  if (
+    (pathname.startsWith("/api/certificates") && request.method !== "GET") ||
+    pathname.startsWith("/api/upload")
+  ) {
     if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }

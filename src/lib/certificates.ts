@@ -1,20 +1,26 @@
 import fs from "fs";
 import path from "path";
 import { CertificateRecord } from "@/types/certificate";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// Create standalone supabase client for server-side operations
-const getSupabase = () => {
-  if (!supabaseUrl || !supabaseKey) return null;
-  return createSupabaseClient(supabaseUrl, supabaseKey);
-};
+import { getSupabaseAdminClient, getSupabaseClient } from "./supabaseServer";
+import {
+  resolveStorageUrl,
+  BUCKET_CERTIFICATES,
+  BUCKET_PHOTOS,
+  isPdfDocument,
+} from "./storage";
 
 const JSON_FILE_PATH = path.join(process.cwd(), "data", "certificates.json");
+
+/**
+ * Checks whether a string is a standard RFC 4122 UUID.
+ * Necessary because Postgres rejects invalid syntax if a non-UUID is passed to a UUID column.
+ */
+function isUUID(value: string): boolean {
+  if (!value || typeof value !== "string") return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value.trim()
+  );
+}
 
 // Read local JSON fallback
 function readLocalJson(): CertificateRecord[] {
@@ -25,7 +31,7 @@ function readLocalJson(): CertificateRecord[] {
     const content = fs.readFileSync(JSON_FILE_PATH, "utf-8");
     return JSON.parse(content) as CertificateRecord[];
   } catch (err) {
-    console.error("Error reading local JSON:", err);
+    console.error("[Local JSON] Error reading local certificates backup:", err);
     return [];
   }
 }
@@ -39,50 +45,117 @@ function writeLocalJson(records: CertificateRecord[]) {
     }
     fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(records, null, 2), "utf-8");
   } catch (err) {
-    console.error("Error writing local JSON:", err);
+    console.error("[Local JSON] Error writing local certificates backup:", err);
   }
 }
 
 /**
- * Get certificate by student ID (trimmed, case-insensitive)
+ * Resolves storage paths into fresh, accessible signed/public URLs.
+ * Leaves dummy sample SVGs out of real document URLs as required.
+ */
+async function enrichCertificateUrls(
+  cert: CertificateRecord
+): Promise<CertificateRecord> {
+  const enriched = { ...cert };
+
+  // 1. Certificate Document Image / PDF handling
+  // If the record has dummy sample SVG, do not treat it as a real uploaded certificate document
+  if (
+    enriched.certificate_image_url &&
+    (enriched.certificate_image_url.startsWith("/sample/") ||
+      enriched.certificate_image_url.includes("sample_certificate"))
+  ) {
+    enriched.certificate_image_url = null;
+  }
+
+  if (
+    enriched.certificate_pdf_url &&
+    (enriched.certificate_pdf_url.startsWith("/sample/") ||
+      enriched.certificate_pdf_url.includes("sample_certificate"))
+  ) {
+    enriched.certificate_pdf_url = null;
+  }
+
+  // Resolve certificate image URL if present
+  if (enriched.certificate_image_url) {
+    const resolved = await resolveStorageUrl(
+      enriched.certificate_image_url,
+      BUCKET_CERTIFICATES
+    );
+    enriched.certificate_image_url = resolved;
+  }
+
+  // Resolve certificate PDF URL if present
+  if (enriched.certificate_pdf_url) {
+    const resolved = await resolveStorageUrl(
+      enriched.certificate_pdf_url,
+      BUCKET_CERTIFICATES
+    );
+    enriched.certificate_pdf_url = resolved;
+  }
+
+  // Resolve student passport photo URL if present
+  if (enriched.student_photo_url) {
+    // Only resolve through Supabase if it's not a local sample asset
+    if (!enriched.student_photo_url.startsWith("/sample/")) {
+      const resolved = await resolveStorageUrl(
+        enriched.student_photo_url,
+        BUCKET_PHOTOS
+      );
+      enriched.student_photo_url = resolved;
+    }
+  }
+
+  return enriched;
+}
+
+/**
+ * Get certificate by student ID or registration number (case-insensitive, trimmed).
+ * Used for public verification portal search.
  */
 export async function getCertificateByStudentId(
-  studentId: string
+  query: string
 ): Promise<CertificateRecord | null> {
-  const cleanId = studentId.trim();
+  const cleanId = query.trim();
   if (!cleanId) return null;
 
   // 1. Try Supabase first
-  const supabase = getSupabase();
+  const supabase = getSupabaseClient() || getSupabaseAdminClient();
   if (supabase) {
     try {
       const { data, error } = await supabase
         .from("certificates")
         .select("*")
-        .eq("student_id", cleanId)
+        .or(`student_id.eq.${cleanId},registration_number.eq.${cleanId}`)
         .maybeSingle();
 
-      if (!error && data) {
-        return data as CertificateRecord;
+      if (error) {
+        console.error("[Supabase getCertificateByStudentId Error]:", error.message);
+      } else if (data) {
+        return await enrichCertificateUrls(data as CertificateRecord);
       }
-    } catch {
-      // Supabase table may not exist yet, fallback to JSON
+    } catch (err) {
+      console.error("[Supabase getCertificateByStudentId Exception]:", err);
     }
   }
 
-  // 2. Fallback to local JSON
+  // 2. Fallback to local JSON if database returned nothing
   const localList = readLocalJson();
   const match = localList.find(
-    (item) => item.student_id.toLowerCase() === cleanId.toLowerCase()
+    (item) =>
+      item.student_id.toLowerCase() === cleanId.toLowerCase() ||
+      (item.registration_number &&
+        item.registration_number.toLowerCase() === cleanId.toLowerCase())
   );
-  return match || null;
+
+  return match ? await enrichCertificateUrls(match) : null;
 }
 
 /**
- * Get all certificates for admin panel
+ * Get all certificates for admin dashboard.
  */
 export async function getAllCertificates(): Promise<CertificateRecord[]> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdminClient() || getSupabaseClient();
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -90,174 +163,253 @@ export async function getAllCertificates(): Promise<CertificateRecord[]> {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data as CertificateRecord[];
+      if (error) {
+        console.error("[Supabase getAllCertificates Error]:", error.message);
+      } else if (data && data.length > 0) {
+        return await Promise.all(
+          data.map((c) => enrichCertificateUrls(c as CertificateRecord))
+        );
       }
-    } catch {
-      // Fallback
-    }
-  }
-
-  return readLocalJson();
-}
-
-/**
- * Get certificate by ID or student ID
- */
-export async function getCertificateById(id: string): Promise<CertificateRecord | null> {
-  const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("certificates")
-        .select("*")
-        .or(`id.eq.${id},student_id.eq.${id}`)
-        .maybeSingle();
-
-      if (!error && data) {
-        return data as CertificateRecord;
-      }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error("[Supabase getAllCertificates Exception]:", err);
     }
   }
 
   const localList = readLocalJson();
-  return (
-    localList.find((item) => item.id === id || item.student_id === id) || null
-  );
+  return await Promise.all(localList.map((c) => enrichCertificateUrls(c)));
 }
 
 /**
- * Create a new certificate record
+ * Get certificate by ID (UUID) or student ID.
+ */
+export async function getCertificateById(
+  idOrStudentId: string
+): Promise<CertificateRecord | null> {
+  const clean = idOrStudentId.trim();
+  if (!clean) return null;
+
+  const supabase = getSupabaseAdminClient() || getSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase.from("certificates").select("*");
+
+      if (isUUID(clean)) {
+        query = query.or(`id.eq.${clean},student_id.eq.${clean}`);
+      } else {
+        query = query.or(`student_id.eq.${clean},registration_number.eq.${clean}`);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) {
+        console.error("[Supabase getCertificateById Error]:", error.message);
+      } else if (data) {
+        return await enrichCertificateUrls(data as CertificateRecord);
+      }
+    } catch (err) {
+      console.error("[Supabase getCertificateById Exception]:", err);
+    }
+  }
+
+  const localList = readLocalJson();
+  const match = localList.find(
+    (item) => item.id === clean || item.student_id === clean
+  );
+  return match ? await enrichCertificateUrls(match) : null;
+}
+
+/**
+ * Create a new certificate record in Supabase database.
  */
 export async function createCertificate(
   payload: CertificateRecord
 ): Promise<CertificateRecord> {
-  const newRecord: CertificateRecord = {
-    ...payload,
-    id: payload.id || `cert_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    created_at: payload.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  const now = new Date().toISOString();
+
+  // Clean and prepare database record
+  // CRITICAL: Do NOT pass non-UUID strings to 'id' column!
+  const recordToInsert: Record<string, unknown> = {
+    student_id: payload.student_id.trim(),
+    student_name: payload.student_name.trim(),
+    date_of_birth: payload.date_of_birth?.trim() || null,
+    registration_number: payload.registration_number?.trim() || null,
+    father_name: payload.father_name?.trim() || null,
+    mother_name: payload.mother_name?.trim() || null,
+    major_subject: payload.major_subject?.trim() || null,
+    cgpa: payload.cgpa?.trim() || null,
+    issue_date: payload.issue_date?.trim() || null,
+    student_photo_url: payload.student_photo_url?.trim() || null,
+    certificate_image_url: payload.certificate_image_url?.trim() || null,
+    certificate_pdf_url: payload.certificate_pdf_url?.trim() || null,
+    degree_title: payload.degree_title?.trim() || "Bachelor of Business Administration",
+    institution_name:
+      payload.institution_name?.trim() ||
+      "University of Development Alternative",
     status: payload.status || "verified",
+    created_at: payload.created_at || now,
+    updated_at: now,
   };
 
-  // 1. Try Supabase
-  const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("certificates")
-        .insert(newRecord)
-        .select()
-        .single();
+  // If a valid UUID is explicitly supplied, include it; otherwise let PostgreSQL gen_random_uuid() generate it
+  if (payload.id && isUUID(payload.id)) {
+    recordToInsert.id = payload.id;
+  }
 
-      if (!error && data) {
-        // Also update local copy
-        const list = readLocalJson();
-        writeLocalJson([data as CertificateRecord, ...list.filter((x) => x.student_id !== data.student_id)]);
-        return data as CertificateRecord;
-      }
-    } catch {
-      // Fall through to local
+  // 1. Insert into Supabase with Admin Client
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("certificates")
+      .insert(recordToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[Supabase createCertificate Database Error]:", error);
+      throw new Error(`Database error creating certificate: ${error.message}`);
+    }
+
+    if (data) {
+      const savedRecord = data as CertificateRecord;
+
+      // Update local backup copy
+      const localList = readLocalJson();
+      writeLocalJson([
+        savedRecord,
+        ...localList.filter((x) => x.student_id !== savedRecord.student_id),
+      ]);
+
+      return await enrichCertificateUrls(savedRecord);
     }
   }
 
-  // 2. Update local JSON
+  // 2. Fallback to local JSON if no database client configured
+  const localRecord: CertificateRecord = {
+    ...(recordToInsert as unknown as CertificateRecord),
+    id: payload.id || `local_${Date.now()}`,
+  };
   const list = readLocalJson();
-  // Check duplicate
   const existingIdx = list.findIndex(
-    (x) => x.student_id.toLowerCase() === newRecord.student_id.toLowerCase()
+    (x) => x.student_id.toLowerCase() === localRecord.student_id.toLowerCase()
   );
   if (existingIdx >= 0) {
-    list[existingIdx] = newRecord;
+    list[existingIdx] = localRecord;
   } else {
-    list.unshift(newRecord);
+    list.unshift(localRecord);
   }
   writeLocalJson(list);
-  return newRecord;
+
+  return localRecord;
 }
 
 /**
- * Update an existing certificate record
+ * Update an existing certificate record in Supabase database.
  */
 export async function updateCertificate(
   idOrStudentId: string,
   payload: Partial<CertificateRecord>
 ): Promise<CertificateRecord | null> {
+  const clean = idOrStudentId.trim();
   const updatedTime = new Date().toISOString();
 
-  // 1. Try Supabase
-  const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("certificates")
-        .update({
-          ...payload,
-          updated_at: updatedTime,
-        })
-        .or(`id.eq.${idOrStudentId},student_id.eq.${idOrStudentId}`)
-        .select()
-        .single();
+  // Strip 'id' from update payload to prevent primary key alteration
+  const { id: _ignoredId, ...updateFields } = payload;
 
-      if (!error && data) {
-        // Also update local
-        const list = readLocalJson();
-        const idx = list.findIndex(
-          (x) => x.id === idOrStudentId || x.student_id === idOrStudentId
-        );
-        if (idx >= 0) {
-          list[idx] = data as CertificateRecord;
-        } else {
-          list.unshift(data as CertificateRecord);
-        }
-        writeLocalJson(list);
-        return data as CertificateRecord;
+  const fieldsToUpdate: Record<string, unknown> = {
+    ...updateFields,
+    updated_at: updatedTime,
+  };
+
+  // Clean empty strings to null for document fields if explicitly passed
+  if ("certificate_image_url" in fieldsToUpdate && !fieldsToUpdate.certificate_image_url) {
+    fieldsToUpdate.certificate_image_url = null;
+  }
+  if ("certificate_pdf_url" in fieldsToUpdate && !fieldsToUpdate.certificate_pdf_url) {
+    fieldsToUpdate.certificate_pdf_url = null;
+  }
+
+  // 1. Update in Supabase
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    let query = supabase.from("certificates").update(fieldsToUpdate);
+
+    if (isUUID(clean)) {
+      query = query.eq("id", clean);
+    } else {
+      query = query.eq("student_id", clean);
+    }
+
+    const { data, error } = await query.select().single();
+
+    if (error) {
+      console.error("[Supabase updateCertificate Error]:", error.message);
+      throw new Error(`Database error updating certificate: ${error.message}`);
+    }
+
+    if (data) {
+      const updated = data as CertificateRecord;
+      const list = readLocalJson();
+      const idx = list.findIndex(
+        (x) => x.id === clean || x.student_id === clean
+      );
+      if (idx >= 0) {
+        list[idx] = updated;
+      } else {
+        list.unshift(updated);
       }
-    } catch {
-      // Fallback
+      writeLocalJson(list);
+
+      return await enrichCertificateUrls(updated);
     }
   }
 
-  // 2. Local JSON
+  // 2. Local JSON fallback
   const list = readLocalJson();
   const idx = list.findIndex(
-    (x) => x.id === idOrStudentId || x.student_id === idOrStudentId
+    (x) => x.id === clean || x.student_id === clean
   );
   if (idx < 0) return null;
 
   list[idx] = {
     ...list[idx],
-    ...payload,
-    updated_at: updatedTime,
+    ...fieldsToUpdate,
   };
   writeLocalJson(list);
-  return list[idx];
+
+  return await enrichCertificateUrls(list[idx]);
 }
 
 /**
- * Delete a certificate record
+ * Delete a certificate record from Supabase database.
  */
 export async function deleteCertificate(idOrStudentId: string): Promise<boolean> {
-  // 1. Try Supabase
-  const supabase = getSupabase();
+  const clean = idOrStudentId.trim();
+  if (!clean) return false;
+
+  // 1. Delete in Supabase
+  const supabase = getSupabaseAdminClient();
   if (supabase) {
-    try {
-      await supabase
-        .from("certificates")
-        .delete()
-        .or(`id.eq.${idOrStudentId},student_id.eq.${idOrStudentId}`);
-    } catch {
-      // Fallback
+    let query = supabase.from("certificates").delete();
+
+    if (isUUID(clean)) {
+      query = query.eq("id", clean);
+    } else {
+      query = query.eq("student_id", clean);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error("[Supabase deleteCertificate Error]:", error.message);
+      throw new Error(`Database error deleting certificate: ${error.message}`);
     }
   }
 
-  // 2. Local JSON
+  // 2. Update local JSON backup
   const list = readLocalJson();
   const filtered = list.filter(
-    (x) => x.id !== idOrStudentId && x.student_id !== idOrStudentId
+    (x) => x.id !== clean && x.student_id !== clean
   );
   writeLocalJson(filtered);
+
   return true;
 }

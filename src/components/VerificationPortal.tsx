@@ -15,9 +15,12 @@ import {
   ShieldCheck,
   ZoomIn,
   Loader2,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { CertificateRecord, DISPLAY_FIELDS } from "@/types/certificate";
 import { downloadCertificateImageAsPdf } from "@/lib/pdfDownloader";
+import { hasUploadedCertificateDocument, isPdfDocument } from "@/lib/storage";
 
 export default function VerificationPortal() {
   const searchParams = useSearchParams();
@@ -83,32 +86,40 @@ export default function VerificationPortal() {
     }
   };
 
-  // Downloads strictly ONLY the certificate image as a high-res PDF
+  // Downloads strictly the certificate document as a PDF
   const handleDownloadPdf = async () => {
     if (!certificate) return;
 
+    const docUrl =
+      certificate.certificate_pdf_url || certificate.certificate_image_url;
+    if (!docUrl) return;
+
     setIsDownloadingPdf(true);
     try {
-      const certImage =
-        certificate.certificate_image_url || "/sample/tania_akter_certificate.svg";
       const fileName = `${certificate.student_name.replace(/\s+/g, "_")}_Certificate_${certificate.student_id}.pdf`;
-
-      await downloadCertificateImageAsPdf(certImage, fileName);
+      await downloadCertificateImageAsPdf(docUrl, fileName);
     } catch (err) {
-      console.error("PDF generation failed:", err);
-      alert("Failed to generate PDF. Please try again or download the certificate image directly.");
+      console.error("Download failed:", err);
+      // Fallback: direct server download stream
+      window.location.href = `/api/certificates/download?id=${encodeURIComponent(certificate.student_id)}`;
     } finally {
       setIsDownloadingPdf(false);
     }
   };
 
-  // Filter display fields to ONLY show if data exists!
+  // Filter display fields to ONLY show if data exists
   const visibleFields = certificate
     ? DISPLAY_FIELDS.filter((f) => {
         const val = certificate[f.key];
         return val !== null && val !== undefined && String(val).trim() !== "";
       })
     : [];
+
+  const hasDoc = hasUploadedCertificateDocument(certificate);
+  const docUrl = certificate
+    ? (certificate.certificate_pdf_url || certificate.certificate_image_url || "")
+    : "";
+  const isPdf = isPdfDocument(docUrl);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f7fb] text-slate-800 antialiased selection:bg-[#d4a037] selection:text-white">
@@ -141,7 +152,7 @@ export default function VerificationPortal() {
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setIsContactOpen(true)}
-              className="text-xs sm:text-sm font-medium text-slate-100 hover:text-white hover:underline transition-colors px-2 py-1"
+              className="text-xs sm:text-sm font-medium text-slate-100 hover:text-white hover:underline transition-colors px-2 py-1 cursor-pointer"
             >
               Contact Us
             </button>
@@ -216,7 +227,7 @@ export default function VerificationPortal() {
                   value={studentIdInput}
                   onChange={(e) => setStudentIdInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Enter Student ID (e.g. 789107238548)"
+                  placeholder="Enter Student ID or Registration Number"
                   className="w-full h-11 sm:h-12 px-3.5 sm:px-4 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 font-medium text-xs sm:text-base outline-none focus:ring-2 focus:ring-[#cca23b] shadow-inner transition"
                   disabled={isChecking}
                 />
@@ -238,7 +249,7 @@ export default function VerificationPortal() {
               </button>
             </form>
 
-            {/* Error Notification Banner (as seen in video & screenshot) */}
+            {/* Error Notification Banner */}
             {errorMessage && (
               <div className="w-full mt-3.5 sm:mt-4 py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-lg bg-[#3a202d]/95 border border-[#6b2e45] text-rose-100 text-xs sm:text-sm font-medium flex items-center justify-center text-center animate-in fade-in duration-200">
                 <span>{errorMessage}</span>
@@ -284,7 +295,7 @@ export default function VerificationPortal() {
               </div>
 
               {/* Grid of Verified Details */}
-              {/* NOTE: Strictly only shows fields that have non-empty data! */}
+              {/* NOTE: Strictly only shows fields that have non-empty data */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4 mt-5 sm:mt-6">
                 {visibleFields.map((field) => {
                   const val = certificate[field.key];
@@ -306,55 +317,86 @@ export default function VerificationPortal() {
             </div>
 
             {/* Card 2: Certificate Document & PDF Download */}
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-4 sm:p-8 flex flex-col items-center">
-              <h3 className="text-sm sm:text-lg font-serif font-medium text-slate-700 text-center mb-4 sm:mb-5">
-                Your certificate
-              </h3>
+            {/* CRITICAL: ONLY RENDERED IF A VALID UPLOADED DOCUMENT EXISTS! */}
+            {hasDoc && (
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-4 sm:p-8 flex flex-col items-center animate-in fade-in duration-200">
+                <h3 className="text-sm sm:text-lg font-serif font-medium text-slate-700 text-center mb-4 sm:mb-5">
+                  Your certificate
+                </h3>
 
-              {/* Certificate Image Frame */}
-              <div className="w-full rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 relative group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={certificate.certificate_image_url || "/sample/tania_akter_certificate.svg"}
-                  alt="Official Degree Certificate"
-                  className="w-full h-auto object-contain cursor-pointer transition group-hover:opacity-95"
-                  onClick={() => setIsZoomOpen(true)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setIsZoomOpen(true)}
-                  className="absolute bottom-2.5 right-2.5 bg-slate-900/80 hover:bg-slate-900 text-white p-1.5 sm:p-2 rounded-lg backdrop-blur-sm shadow-md transition opacity-80 group-hover:opacity-100 flex items-center gap-1 text-[11px] font-medium"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">View Large</span>
-                </button>
-              </div>
+                {isPdf ? (
+                  /* PDF Document Preview */
+                  <div className="w-full space-y-3">
+                    <div className="w-full h-80 sm:h-[480px] rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative">
+                      <iframe
+                        src={docUrl}
+                        className="w-full h-full border-0"
+                        title="Certificate Document Preview"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <FileText className="w-4 h-4 text-rose-600" />
+                        Official Certificate Document (PDF)
+                      </span>
+                      <a
+                        href={docUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline font-semibold inline-flex items-center gap-1"
+                      >
+                        <span>Open in New Tab</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  /* Image Certificate Preview */
+                  <div className="w-full rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 relative group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={docUrl}
+                      alt="Official Degree Certificate"
+                      className="w-full h-auto object-contain cursor-pointer transition group-hover:opacity-95"
+                      onClick={() => setIsZoomOpen(true)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsZoomOpen(true)}
+                      className="absolute bottom-2.5 right-2.5 bg-slate-900/80 hover:bg-slate-900 text-white p-1.5 sm:p-2 rounded-lg backdrop-blur-sm shadow-md transition opacity-80 group-hover:opacity-100 flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">View Large</span>
+                    </button>
+                  </div>
+                )}
 
-              {/* Download Button: Downloads strictly ONLY the certificate image as PDF */}
-              <div className="mt-6 sm:mt-7 flex flex-col items-center gap-1.5 sm:gap-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadPdf}
-                  disabled={isDownloadingPdf}
-                  className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg bg-[#14294b] hover:bg-[#0e1d35] active:bg-[#0a1527] text-white font-bold text-xs sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
-                >
-                  {isDownloadingPdf ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      Generating Certificate PDF...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      Download PDF
-                    </>
-                  )}
-                </button>
-                <span className="text-[10px] sm:text-[11px] text-slate-400 text-center">
-                  Downloads high-resolution certificate document as PDF
-                </span>
+                {/* Download Button: ONLY rendered when a downloadable document is available */}
+                <div className="mt-6 sm:mt-7 flex flex-col items-center gap-1.5 sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={isDownloadingPdf}
+                    className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg bg-[#14294b] hover:bg-[#0e1d35] active:bg-[#0a1527] text-white font-bold text-xs sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
+                  >
+                    {isDownloadingPdf ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        Downloading Document...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        Download PDF
+                      </>
+                    )}
+                  </button>
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 text-center">
+                    Downloads official certificate document
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </main>
@@ -372,7 +414,7 @@ export default function VerificationPortal() {
           <div className="flex items-center gap-3 text-slate-400 text-[11px] sm:text-xs">
             <button
               onClick={() => setIsContactOpen(true)}
-              className="hover:text-slate-600 transition"
+              className="hover:text-slate-600 transition cursor-pointer"
             >
               Contact Support
             </button>
@@ -390,7 +432,7 @@ export default function VerificationPortal() {
           <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setIsContactOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-md"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-md cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -439,7 +481,7 @@ export default function VerificationPortal() {
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setIsContactOpen(false)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-semibold transition"
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-semibold transition cursor-pointer"
               >
                 Close
               </button>
@@ -448,16 +490,16 @@ export default function VerificationPortal() {
         </div>
       )}
 
-      {/* Certificate Fullscreen Zoom Modal */}
-      {isZoomOpen && certificate && (
+      {/* Certificate Fullscreen Zoom Modal (Only for images) */}
+      {isZoomOpen && hasDoc && !isPdf && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-4">
           <div className="w-full max-w-5xl flex items-center justify-between text-white pb-3">
             <span className="text-xs sm:text-sm font-semibold truncate mr-2">
-              Official Certificate — {certificate.student_name}
+              Official Certificate — {certificate?.student_name}
             </span>
             <button
               onClick={() => setIsZoomOpen(false)}
-              className="text-white hover:text-amber-300 p-1.5 sm:p-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
+              className="text-white hover:text-amber-300 p-1.5 sm:p-2 rounded-lg bg-white/10 hover:bg-white/20 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -465,7 +507,7 @@ export default function VerificationPortal() {
           <div className="relative max-h-[80vh] sm:max-h-[85vh] max-w-5xl overflow-auto rounded-xl bg-white p-2 shadow-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={certificate.certificate_image_url || "/sample/tania_akter_certificate.svg"}
+              src={docUrl}
               alt="Full Resolution Certificate"
               className="w-full h-auto object-contain max-h-[75vh] sm:max-h-[80vh]"
             />
@@ -473,14 +515,14 @@ export default function VerificationPortal() {
           <div className="mt-3 sm:mt-4 flex gap-3">
             <button
               onClick={handleDownloadPdf}
-              className="px-5 sm:px-6 py-2 rounded-lg bg-[#cca23b] text-[#12284c] font-bold text-xs sm:text-sm shadow hover:bg-amber-400 transition flex items-center gap-2"
+              className="px-5 sm:px-6 py-2 rounded-lg bg-[#cca23b] text-[#12284c] font-bold text-xs sm:text-sm shadow hover:bg-amber-400 transition flex items-center gap-2 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Download PDF
             </button>
             <button
               onClick={() => setIsZoomOpen(false)}
-              className="px-4 sm:px-5 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white font-medium text-xs sm:text-sm transition"
+              className="px-4 sm:px-5 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white font-medium text-xs sm:text-sm transition cursor-pointer"
             >
               Close
             </button>

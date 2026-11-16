@@ -67,7 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_certificates_reg_num ON public.certificates (regi
 -- 3. Enable Row Level Security (RLS)
 ALTER TABLE public.certificates ENABLE ROW LEVEL SECURITY;
 
--- 4. Policies:
+-- 4. Database Policies for public.certificates Table
 DROP POLICY IF EXISTS "Public can view certificates by student_id" ON public.certificates;
 CREATE POLICY "Public can view certificates by student_id"
     ON public.certificates
@@ -75,55 +75,82 @@ CREATE POLICY "Public can view certificates by student_id"
     TO public
     USING (true);
 
+DROP POLICY IF EXISTS "Allow management on certificates" ON public.certificates;
 DROP POLICY IF EXISTS "Allow anon full access for admin management" ON public.certificates;
-CREATE POLICY "Allow anon full access for admin management"
+CREATE POLICY "Allow management on certificates"
     ON public.certificates
     FOR ALL
     TO public
     USING (true)
     WITH CHECK (true);
 
--- 5. Insert Sample Student Tania Akter (789107238548)
-INSERT INTO public.certificates (
-    student_id,
-    student_name,
-    date_of_birth,
-    registration_number,
-    father_name,
-    mother_name,
-    major_subject,
-    cgpa,
-    issue_date,
-    student_photo_url,
-    certificate_image_url,
-    certificate_pdf_url,
-    degree_title
-) VALUES (
-    '789107238548',
-    'Tania Akter',
-    '09 Sep 1992',
-    '358737',
-    'Rafiqul Islam',
-    'Nahar Begum',
-    'Bachelor of Business Administration (BBA)',
-    '3.25',
-    '2020-12-01',
-    '/sample/tania_akter_photo.svg',
-    '/sample/tania_akter_certificate.svg',
-    '/sample/tania_akter_certificate.pdf',
-    'Bachelor of Business Administration'
-) ON CONFLICT (student_id) DO UPDATE SET
-    student_name = EXCLUDED.student_name,
-    date_of_birth = EXCLUDED.date_of_birth,
-    registration_number = EXCLUDED.registration_number,
-    father_name = EXCLUDED.father_name,
-    mother_name = EXCLUDED.mother_name,
-    major_subject = EXCLUDED.major_subject,
-    cgpa = EXCLUDED.cgpa,
-    issue_date = EXCLUDED.issue_date,
-    student_photo_url = EXCLUDED.student_photo_url,
-    certificate_image_url = EXCLUDED.certificate_image_url,
-    certificate_pdf_url = EXCLUDED.certificate_pdf_url;`;
+-- 5. Storage Buckets Setup (certificates & photos)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('certificates', 'certificates', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('photos', 'photos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 6. Storage Policies for storage.objects
+DROP POLICY IF EXISTS "Allow upload to certificates bucket" ON storage.objects;
+CREATE POLICY "Allow upload to certificates bucket"
+    ON storage.objects
+    FOR INSERT
+    TO public
+    WITH CHECK (bucket_id = 'certificates');
+
+DROP POLICY IF EXISTS "Public can view certificate files" ON storage.objects;
+CREATE POLICY "Public can view certificate files"
+    ON storage.objects
+    FOR SELECT
+    TO public
+    USING (bucket_id = 'certificates');
+
+DROP POLICY IF EXISTS "Allow update certificates bucket" ON storage.objects;
+CREATE POLICY "Allow update certificates bucket"
+    ON storage.objects
+    FOR UPDATE
+    TO public
+    USING (bucket_id = 'certificates')
+    WITH CHECK (bucket_id = 'certificates');
+
+DROP POLICY IF EXISTS "Allow delete certificates bucket" ON storage.objects;
+CREATE POLICY "Allow delete certificates bucket"
+    ON storage.objects
+    FOR DELETE
+    TO public
+    USING (bucket_id = 'certificates');
+
+DROP POLICY IF EXISTS "Allow upload to photos bucket" ON storage.objects;
+CREATE POLICY "Allow upload to photos bucket"
+    ON storage.objects
+    FOR INSERT
+    TO public
+    WITH CHECK (bucket_id = 'photos');
+
+DROP POLICY IF EXISTS "Public can view photo files" ON storage.objects;
+CREATE POLICY "Public can view photo files"
+    ON storage.objects
+    FOR SELECT
+    TO public
+    USING (bucket_id = 'photos');
+
+DROP POLICY IF EXISTS "Allow update photos bucket" ON storage.objects;
+CREATE POLICY "Allow update photos bucket"
+    ON storage.objects
+    FOR UPDATE
+    TO public
+    USING (bucket_id = 'photos')
+    WITH CHECK (bucket_id = 'photos');
+
+DROP POLICY IF EXISTS "Allow delete photos bucket" ON storage.objects;
+CREATE POLICY "Allow delete photos bucket"
+    ON storage.objects
+    FOR DELETE
+    TO public
+    USING (bucket_id = 'photos');`;
 
   const copySql = () => {
     navigator.clipboard.writeText(sqlSchema);

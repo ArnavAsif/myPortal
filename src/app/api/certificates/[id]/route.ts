@@ -17,7 +17,7 @@ export async function GET(
     }
     return NextResponse.json({ success: true, data: cert });
   } catch (err: unknown) {
-    console.error("Get certificate error:", err);
+    console.error("[GET /api/certificates/[id] Error]:", err);
     return NextResponse.json(
       { error: "Failed to fetch certificate" },
       { status: 500 }
@@ -29,30 +29,47 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionCookie = request.cookies.get("uoda_admin_session");
+  if (sessionCookie?.value !== "authenticated") {
+    return NextResponse.json(
+      { error: "Unauthorized access. Please log in to edit certificates." },
+      { status: 401 }
+    );
+  }
+
   const { id } = await params;
   try {
     const body = await request.json();
     const updated = await updateCertificate(id, body);
     if (!updated) {
       return NextResponse.json(
-        { error: "Certificate not found to update" },
+        { error: "Certificate record not found to update" },
         { status: 404 }
       );
     }
     return NextResponse.json({ success: true, data: updated });
   } catch (err: unknown) {
-    console.error("Update certificate error:", err);
+    console.error("[PUT /api/certificates/[id] Error]:", err);
+    const message = err instanceof Error ? err.message : "Failed to update certificate";
     return NextResponse.json(
-      { error: "Failed to update certificate" },
+      { error: message },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const sessionCookie = request.cookies.get("uoda_admin_session");
+  if (sessionCookie?.value !== "authenticated") {
+    return NextResponse.json(
+      { error: "Unauthorized access. Please log in to delete certificates." },
+      { status: 401 }
+    );
+  }
+
   const { id } = await params;
   try {
     await deleteCertificate(id);
@@ -61,9 +78,10 @@ export async function DELETE(
       message: "Certificate deleted successfully",
     });
   } catch (err: unknown) {
-    console.error("Delete certificate error:", err);
+    console.error("[DELETE /api/certificates/[id] Error]:", err);
+    const message = err instanceof Error ? err.message : "Failed to delete certificate";
     return NextResponse.json(
-      { error: "Failed to delete certificate" },
+      { error: message },
       { status: 500 }
     );
   }

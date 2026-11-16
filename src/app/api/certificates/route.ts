@@ -7,7 +7,7 @@ export async function GET() {
     const list = await getAllCertificates();
     return NextResponse.json({ success: true, data: list });
   } catch (err: unknown) {
-    console.error("Fetch certificates error:", err);
+    console.error("[GET /api/certificates Error]:", err);
     return NextResponse.json(
       { error: "Failed to fetch certificates." },
       { status: 500 }
@@ -17,11 +17,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const sessionCookie = request.cookies.get("uoda_admin_session");
+    if (sessionCookie?.value !== "authenticated") {
+      return NextResponse.json(
+        { error: "Unauthorized access. Please log in to create certificates." },
+        { status: 401 }
+      );
+    }
+
     const body: CertificateRecord = await request.json();
 
-    if (!body.student_id || !body.student_name) {
+    if (!body.student_id?.trim() || !body.student_name?.trim()) {
       return NextResponse.json(
-        { error: "Student ID and Student Name are required." },
+        { error: "Student ID and Student Name are required fields." },
         { status: 400 }
       );
     }
@@ -29,9 +37,10 @@ export async function POST(request: NextRequest) {
     const created = await createCertificate(body);
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: unknown) {
-    console.error("Create certificate error:", err);
+    console.error("[POST /api/certificates Error]:", err);
+    const message = err instanceof Error ? err.message : "Failed to create certificate.";
     return NextResponse.json(
-      { error: "Failed to create certificate." },
+      { error: message },
       { status: 500 }
     );
   }

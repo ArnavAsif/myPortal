@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Copy,
   Check,
+  User,
 } from "lucide-react";
 import { CertificateRecord } from "@/types/certificate";
 
@@ -228,13 +229,17 @@ export default function AdminDashboardPage() {
                       {/* Photo & Name */}
                       <td className="py-3 px-3 sm:px-4">
                         <div className="flex items-center gap-2.5 sm:gap-3">
-                          <div className="w-9 h-11 sm:w-10 sm:h-12 rounded-md overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={cert.student_photo_url || "/sample/tania_akter_photo.svg"}
-                              alt={cert.student_name}
-                              className="w-full h-full object-cover object-top"
-                            />
+                          <div className="w-9 h-11 sm:w-10 sm:h-12 rounded-md overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
+                            {cert.student_photo_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={cert.student_photo_url}
+                                alt={cert.student_name}
+                                className="w-full h-full object-cover object-top"
+                              />
+                            ) : (
+                              <User className="w-5 h-5 text-slate-400" />
+                            )}
                           </div>
                           <div>
                             <span className="font-bold text-slate-900 block leading-tight text-xs sm:text-sm">
